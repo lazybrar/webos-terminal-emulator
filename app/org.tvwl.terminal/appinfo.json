@@ -1,6 +1,6 @@
 {
     "id": "org.tvwl.terminal",
-    "version": "1.0.1",
+    "version": "1.1.0",
     "vendor": "tvwl",
     "type": "web",
     "main": "index.html",

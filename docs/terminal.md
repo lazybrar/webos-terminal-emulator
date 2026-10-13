@@ -14,14 +14,14 @@ make build/wlterm2                           # aarch64-linux-gnu-gcc -static ...
 
 ## Install on the TV
 
+Install the ipk (see the README): it contains `wlterm2` and `bin/wlterm-launch` under
+`/media/developer/apps/usr/palm/applications/org.tvwl.terminal/`, and the first launch downloads Fira Code into
+`/media/developer/fonts/`. For development, copy the binary yourself:
+
 ```sh
 export TV_IP=<address of your TV>
 scripts/deploy.sh build/wlterm2 /media/developer/bin/wlterm2
-scripts/deploy.sh scripts/wlterm-launch /media/developer/bin/wlterm-launch
-# fonts, downloaded by the TV itself:
-scripts/tv.sh 'mkdir -p /media/developer/fonts && cd /media/developer/fonts &&
-  curl -sSfL -o f.zip https://github.com/tonsky/FiraCode/releases/download/6.2/Fira_Code_v6.2.zip &&
-  unzip -o -j f.zip ttf/FiraCode-Regular.ttf ttf/FiraCode-Bold.ttf && rm f.zip'
+scripts/deploy.sh scripts/wlterm-launch /media/developer/bin/wlterm-launch     # looks for wlterm2 next to itself
 ```
 
 `deploy.sh` starts a short-lived HTTP server on your PC (bound to the LAN address, serving one temp directory that holds only the
@@ -54,15 +54,10 @@ with xterm sequences; keys auto-repeat.
 
 ## Home-screen icon
 
-```sh
-scripts/tv.sh 'mkdir -p /media/developer/temp'
-make ipk && scripts/deploy.sh build/org.tvwl.terminal.ipk /media/developer/temp/org.tvwl.terminal.ipk
-scripts/tv.sh 'timeout 25 luna-send -i -f luna://com.webos.appInstallService/dev/install \
-  "{\"id\":\"org.tvwl.terminal\",\"ipkUrl\":\"/media/developer/temp/org.tvwl.terminal.ipk\",\"subscribe\":true}"' | grep state
-```
+`make ipk` builds it (and `scripts/deploy.sh` + `luna-send ... appInstallService/dev/install` installs it, see the README).
 
 The app is a tiny web app. Its page calls `luna://org.webosbrew.hbchannel.service/exec` (root, provided by the Homebrew Channel) to run
-`wlterm-launch`, then closes itself. A *native* app type would run inside webOS's sandbox jail and lose system access, which is why the
+the bundled `bin/wlterm-launch` (found from the page's own URL), then closes itself. A *native* app type would run inside webOS's sandbox jail and lose system access, which is why the
 launcher is a web app. Clicking the icon again while a terminal is running **restarts** it (`wlterm-launch` closes the old one and starts a new one; the old window is hidden behind the launcher card and cannot be re-shown). The page launches on load and on every `webOSRelaunch`, and `appinfo.json` sets `handlesRelaunch`; without that a second click only flashes the card and drops to Home. Launch it from the icon, or `luna-send -n 1 luna://com.webos.service.applicationmanager/launch '{"id":"org.tvwl.terminal"}'`.
 The `.ipk` container must use `ar` member names **without** the trailing `/` (GNU `ar` adds it and the installer then reports
 "IPK Extraction Failure"), so `app/build-ipk.sh` writes the archive itself.

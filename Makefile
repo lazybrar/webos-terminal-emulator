@@ -22,6 +22,6 @@ gpu: build/wlgl
 build/wlgl: gpu/wlgl.c | build
 	$(CLANG) $(ARM32) -mfpu=neon-vfpv4 -mfloat-abi=softfp -Wl,--dynamic-linker=/lib/ld-linux.so.3 -o $@ $< -L$(SYSROOT) \
 	  -l:libEGL.so.1 -l:libGLESv2.so.2 -l:libwayland-egl.so.1 -l:libwayland-client.so.0 -l:libwayland-webos-client.so.1 -l:libc.so.6
-ipk: | build
+ipk: build/wlterm2 | build
 	app/build-ipk.sh build/org.tvwl.terminal.ipk
 clean: ; rm -rf build

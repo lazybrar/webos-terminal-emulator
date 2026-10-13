@@ -8,6 +8,11 @@
 // The page stays loaded while the terminal window is in front, so a second click on the icon does not reload it:
 // launch on load AND on every relaunch (webOSRelaunch), otherwise the second click only flashes this card.
 function done(t) { document.getElementById('m').textContent = t; }
+// wlterm2 and its launcher ship inside this app's folder; find it from the page URL (file:///.../org.tvwl.terminal/index.html).
+function appDir() {
+  var d = decodeURIComponent(location.pathname).replace(/\/[^\/]*$/, '');
+  return d.charAt(0) === '/' ? d : '/media/developer/apps/usr/palm/applications/org.tvwl.terminal';
+}
 function launch() {
   done('Starting terminal…');
   try {
@@ -16,7 +21,7 @@ function launch() {
       var r = {}; try { r = JSON.parse(msg); } catch (e) {}
       if (r.returnValue) { setTimeout(function () { window.close(); }, 900); } else { done('Launch failed: ' + (r.errorText || msg)); }
     };
-    bridge.call('luna://org.webosbrew.hbchannel.service/exec', JSON.stringify({ command: '/media/developer/bin/wlterm-launch' }));
+    bridge.call('luna://org.webosbrew.hbchannel.service/exec', JSON.stringify({ command: appDir() + '/bin/wlterm-launch' }));
   } catch (e) { done('PalmServiceBridge unavailable: ' + e); }
 }
 document.addEventListener('webOSRelaunch', launch);

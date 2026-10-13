@@ -1,11 +1,19 @@
 #!/bin/sh
 # Build org.tvwl.terminal ipk (ar archive of debian-binary, control.tar.gz, data.tar.gz) like ares-package does.
+# Self-contained: bundles the launcher page, the wlterm2 binary (build/wlterm2, run `make` first) and bin/wlterm-launch.
 set -e
-here=$(cd "$(dirname "$0")" && pwd); id=org.tvwl.terminal; out=${1:-$here/$id.ipk}
+here=$(cd "$(dirname "$0")" && pwd); root=$(dirname "$here"); id=org.tvwl.terminal; out=${1:-$here/$id.ipk}
+ver=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$here/$id/appinfo.json")
+[ -n "$ver" ] || { echo "no version in appinfo.json" >&2; exit 1; }
+[ -x "$root/build/wlterm2" ] || { echo "build/wlterm2 missing: run 'make build/wlterm2' first" >&2; exit 1; }
 w=$(mktemp -d); trap 'rm -rf "$w"' EXIT
-mkdir -p "$w/data/usr/palm/applications/$id" "$w/control"
-cp "$here/$id"/appinfo.json "$here/$id"/index.html "$here/$id"/icon80.png "$here/$id"/icon130.png "$w/data/usr/palm/applications/$id/"
-printf 'Package: %s\nVersion: 1.0.1\nSection: misc\nPriority: optional\nArchitecture: all\nInstalled-Size: 40\nMaintainer: tvwl <noreply@example.invalid>\nDescription: wlterm2 launcher\nWebos-Package-Format-Version: 2\nWebos-Packager-Info: {"app":"%s"}\n' "$id" "$id" > "$w/control/control"
+app=$w/data/usr/palm/applications/$id
+mkdir -p "$app/bin" "$w/control"
+cp "$here/$id"/appinfo.json "$here/$id"/index.html "$here/$id"/icon80.png "$here/$id"/icon130.png "$app/"
+install -m 755 "$root/build/wlterm2" "$app/bin/wlterm2"
+install -m 755 "$root/scripts/wlterm-launch" "$app/bin/wlterm-launch"
+size=$(du -sk "$w/data" | cut -f1)
+printf 'Package: %s\nVersion: %s\nSection: misc\nPriority: optional\nArchitecture: all\nInstalled-Size: %s\nMaintainer: tvwl <noreply@example.invalid>\nDescription: Terminal emulator for rooted webOS TVs (wlterm2 + launcher)\nWebos-Package-Format-Version: 2\nWebos-Packager-Info: {"app":"%s"}\n' "$id" "$ver" "$size" "$id" > "$w/control/control"
 printf '2.0\n' > "$w/debian-binary"
 tar --owner=0 --group=0 -C "$w/control" -czf "$w/control.tar.gz" .
 tar --owner=0 --group=0 -C "$w/data" -czf "$w/data.tar.gz" .

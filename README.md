@@ -23,18 +23,38 @@ Docs: **[running the terminal](docs/terminal.md)** · **[getting the fish shell]
 * The compositor speaks `wl_shm`, `wl_shell`, `wl_drm`, `zwp_linux_dmabuf_v1`, `wl_seat` and LG's `wl_webos_shell`. There is **no `xdg_shell`**.
 * A window only stays up if it registers an `appId` through `wl_webos_shell` (see [gpu-apps.md](docs/gpu-apps.md)). A bare `wl_shell` surface is dropped after about a second.
 
-## Quick start
+## Install (end users)
 
-Requirements: a rooted webOS TV with telnet (port 23) and the Homebrew Channel; on the PC `aarch64-linux-gnu-gcc`, `stb` (`stb/stb_truetype.h`), `clang` + `lld`; optional `resvg`, `ffmpeg`.
+Requirements: a rooted webOS TV with the Homebrew Channel (it provides the root `exec` service the icon uses).
+
+1. On the TV (telnet / SSH as root), download the ipk from the [latest release](https://github.com/lazybrar/webos-terminal-emulator/releases/latest)
+   (checksum in `SHA256SUMS`) and install it:
+   ```sh
+   mkdir -p /media/developer/temp && cd /media/developer/temp
+   curl -sSfLO https://github.com/lazybrar/webos-terminal-emulator/releases/latest/download/org.tvwl.terminal_1.1.0_all.ipk
+   luna-send -i -f luna://com.webos.appInstallService/dev/install \
+     '{"id":"org.tvwl.terminal","ipkUrl":"/media/developer/temp/org.tvwl.terminal_1.1.0_all.ipk","subscribe":true}'
+   ```
+   Wait for `"state": "installed"`. (Other installers that accept dev-mode ipks should work too; this is the one tested.)
+2. Open **Terminal** from the home screen. The first start downloads Fira Code (needs internet; without it the TV's DroidSansMono is used).
+3. Optional: [get fish](docs/fish.md), and [configure](docs/terminal.md#settings) shell, home and fonts in `/media/developer/wlterm.conf`.
+
+The ipk is self-contained: `wlterm2` and its launcher live inside the app folder, nothing is copied by hand.
+Clicking the icon again restarts the terminal.
+
+## Build from source
+
+On the PC: `aarch64-linux-gnu-gcc`, `stb` (`stb/stb_truetype.h`), `clang` + `lld`; optional `resvg`, `ffmpeg`.
 
 ```sh
+make                 # build/wlterm2, build/wlglobals, build/shm-window
+make ipk             # build/org.tvwl.terminal.ipk (bundles build/wlterm2)
 export TV_IP=<address of your TV>
-make                                   # build/wlterm2, build/wlglobals, build/shm-window
-scripts/deploy.sh build/wlterm2 /media/developer/bin/wlterm2
-scripts/deploy.sh scripts/wlterm-launch /media/developer/bin/wlterm-launch
-# put Fira Code on the TV (see docs/terminal.md), then:
-scripts/tv.sh 'XDG_RUNTIME_DIR=/tmp/xdg setsid /media/developer/bin/wlterm2 </dev/null >/tmp/wlterm2.log 2>&1 &'
+scripts/deploy.sh build/org.tvwl.terminal.ipk /media/developer/temp/org.tvwl.terminal.ipk   # then install as above
 ```
+
+For development without the ipk: `scripts/deploy.sh build/wlterm2 /media/developer/bin/wlterm2`, then
+`scripts/tv.sh 'XDG_RUNTIME_DIR=/tmp/xdg setsid /media/developer/bin/wlterm2 </dev/null >/tmp/wlterm2.log 2>&1 &'`.
 
 ## Status (what was tested on a real TV)
 
