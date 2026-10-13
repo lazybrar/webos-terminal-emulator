@@ -13,7 +13,7 @@ a launcher icon, and notes on how all of it works.
 | [`overlay/`](overlay) | Boot hook that makes `/usr`, `/lib`, `/etc` writable and persistent on top of the read-only squashfs. |
 | [`scripts/`](scripts) | Telnet/HTTP helpers: run commands, copy files, inject keystrokes, take screenshots. |
 
-Docs: **[running the terminal](docs/terminal.md)** · **[writing GPU apps](docs/gpu-apps.md)** · **[system notes (overlay, Alpine userland, test loop)](docs/system.md)**
+Docs: **[running the terminal](docs/terminal.md)** · **[getting the fish shell](docs/fish.md)** · **[writing Wayland apps for webOS](docs/wayland-apps.md)** · **[writing GPU apps](docs/gpu-apps.md)** · **[system notes (overlay, Alpine userland, test loop)](docs/system.md)**
 
 ## Facts that shape everything
 

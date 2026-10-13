@@ -26,7 +26,7 @@ Static aarch64 programs run on this kernel, and so do dynamic **musl** ones, pro
 Alpine's musl loader is named `ld-musl-aarch64.so.1`, which does not collide with the TV's glibc loader `ld-linux.so.3`, so a whole
 64-bit userland can live next to the stock 32-bit one. It has no GPU access (see [gpu-apps.md](gpu-apps.md)).
 
-Install, all on the TV (it has curl, wget, tar, gzip, TLS; nothing is staged on the PC):
+Step-by-step with troubleshooting: **[fish.md](fish.md)**. In short, all on the TV (it has curl, wget, tar, gzip, TLS; nothing is staged on the PC):
 
 ```sh
 cd /media/developer && mkdir -p a64boot && cd a64boot
