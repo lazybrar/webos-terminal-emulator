@@ -1,6 +1,7 @@
 # wlterm2 settings. Copy to /media/developer/wlterm.conf (or point WLTERM_CONF / -c at another file).
 # Precedence: command-line flags > this file > built-in defaults. Everything is optional.
 
+# renderer   = auto                        # auto (GPU if installed, CPU fallback) | gl | cpu
 # shell      = /usr/alpine/usr/bin/fish   # default: that one if installed, else /bin/sh
 # home       = /media/developer/home      # $HOME (created if missing); default shown
 # cwd        = /media/developer           # starting directory; default: home

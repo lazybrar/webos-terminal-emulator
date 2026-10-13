@@ -5,7 +5,7 @@ a launcher icon, and notes on how all of it works.
 
 | Part | What it is |
 |---|---|
-| [`terminal/wlterm2.c`](terminal/wlterm2.c) | Terminal emulator: Fira Code (any TTF), truecolor, UTF-8, scrollback, alternate screen, `xterm-256color`. 64-bit static. |
+| [`terminal/wlterm2.c`](terminal/wlterm2.c) | Terminal emulator: Fira Code (any TTF), truecolor, UTF-8, scrollback, alternate screen, `xterm-256color`. Two renderers from one source: CPU (`wlterm2`, 64-bit static) and **GPU (`wlterm-gl`, GLES2 on the TV's PowerVR, 32-bit)**. |
 | [`gpu/wlgl.c`](gpu/wlgl.c) | GLES2 triangle on the TV's own PowerVR GPU through EGL. 32-bit, links the TV's libs. |
 | [`examples/`](examples) | `wlglobals` (list compositor globals), `shm-window` (smallest possible window), no libc. |
 | [`app/`](app) | Launcher app (icon on the home screen) built as an `.ipk`. |
@@ -39,7 +39,8 @@ Requirements: a rooted webOS TV with the Homebrew Channel (it provides the root 
 2. Open **Terminal** from the home screen. The first start downloads Fira Code (needs internet; without it the TV's DroidSansMono is used).
 3. Optional: [get fish](docs/fish.md), and [configure](docs/terminal.md#settings) shell, home and fonts in `/media/developer/wlterm.conf`.
 
-The ipk is self-contained: `wlterm2` and its launcher live inside the app folder, nothing is copied by hand.
+The ipk is self-contained: both renderers and the launcher live inside the app folder, nothing is copied by hand. The GPU renderer is used when
+available (`renderer = auto|gl|cpu` in the config); if it fails to start the CPU one takes over.
 Clicking the icon again restarts the terminal.
 
 ## Build from source
@@ -48,7 +49,8 @@ On the PC: `aarch64-linux-gnu-gcc`, `stb` (`stb/stb_truetype.h`), `clang` + `lld
 
 ```sh
 make                 # build/wlterm2, build/wlglobals, build/shm-window
-make ipk             # build/org.tvwl.terminal.ipk (bundles build/wlterm2)
+make gl-term         # optional GPU terminal, needs scripts/make-sysroot32.sh + scripts/pull-sysroot.sh first (docs/terminal.md)
+make ipk             # build/org.tvwl.terminal.ipk (bundles build/wlterm2, and build/wlterm-gl if built)
 export TV_IP=<address of your TV>
 scripts/deploy.sh build/org.tvwl.terminal.ipk /media/developer/temp/org.tvwl.terminal.ipk   # then install as above
 ```
@@ -58,11 +60,12 @@ For development without the ipk: `scripts/deploy.sh build/wlterm2 /media/develop
 
 ## Status (what was tested on a real TV)
 
-Tested on webOS 7.5.8 (LG, Realtek SoC, PowerVR GPU): window creation and `appId` recipe, the GLES2 example (about 60 fps),
-terminal rendering with Fira Code, truecolor, 256-color, bold, underline, strike, cursor, key input, the persistent overlay
-across a reboot, the launcher app and its icon, the screenshot and keystroke-injection loop.
-Implemented but **not yet verified on hardware**: scrollback (Shift+PgUp/PgDn), alternate screen apps (vim, tmux, htop),
-scroll regions, DEC line drawing.
+Tested on webOS 7.5.8 (LG, Realtek SoC, PowerVR Rogue BXE-4-32): window creation and `appId` recipe, the GLES2 example (about 60 fps),
+terminal rendering with Fira Code on **both renderers** (truecolor, 256-color, bold, dim, underline, strike, inverse, cursor, Unicode and box drawing),
+key input, the alternate screen, a 200,000-line scroll flood, glyph-atlas overflow on the GPU renderer (9,000 distinct glyphs), the persistent
+overlay across a reboot, the launcher app and its icon, the screenshot and keystroke-injection loop.
+Implemented but **not yet verified on hardware**: scrollback paging (Shift+PgUp/PgDn; on the GPU renderer too), full-screen apps (vim, tmux, htop;
+the alternate-screen escape sequences themselves work), scroll regions, DEC line drawing.
 Known gaps: no ligatures (needs OpenType shaping), no double-width (CJK) characters, no clipboard, no mouse, no italic face,
 box-drawing glyphs come from the font and do not always join cell to cell, SDL2 apps untested.
 

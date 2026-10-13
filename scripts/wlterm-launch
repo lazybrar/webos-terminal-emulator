@@ -1,14 +1,18 @@
 #!/bin/sh
-# Start wlterm2 detached (runs as root on the TV). Extra arguments are passed to wlterm2.
-# - wlterm2 is looked up next to this script (the installed app), then in /media/developer/bin.
+# Start the terminal detached (runs as root on the TV). Extra arguments are passed to it.
+# - Renderer (config key `renderer`, default auto): wlterm-gl (GLES2 on the GPU, 32-bit) if installed, else/when it fails to start
+#   wlterm2 (CPU, 64-bit static). `renderer = cpu` or `renderer = gl` forces one.
+# - Binaries are looked up next to this script (the installed app), then in /media/developer/bin.
 # - Fira Code is downloaded on first run; if that fails the TV's DroidSansMono is used so the terminal still opens.
 # - If one is already running its window is hidden behind the launcher card and cannot be re-shown, so it is closed
 #   (clean quit, then kill) and replaced by a fresh one.
 here=$(cd "$(dirname "$0")" && pwd)
-bin=$here/wlterm2; [ -x "$bin" ] || bin=/media/developer/bin/wlterm2
+find_bin() { for d in "$here" /media/developer/bin; do [ -x "$d/$1" ] && { echo "$d/$1"; return; }; done; }
+cpu=$(find_bin wlterm2); gl=$(find_bin wlterm-gl)
 export XDG_RUNTIME_DIR=/tmp/xdg
 log=/tmp/wlterm2.log
 conf=${WLTERM_CONF:-/media/developer/wlterm.conf}
+renderer=$(sed -n 's/^[[:space:]]*renderer[[:space:]]*=[[:space:]]*\([a-z]*\).*/\1/p' "$conf" 2>/dev/null | tail -1); renderer=${renderer:-auto}
 
 fonts=/media/developer/fonts; reg=$fonts/FiraCode-Regular.ttf
 extra=
@@ -19,11 +23,21 @@ if [ ! -f "$reg" ] && ! grep -q '^[[:space:]]*font[[:space:]]*=' "$conf" 2>/dev/
   [ -f "$reg" ] || extra="-f /usr/share/fonts/DroidSansMono.ttf"
 fi
 
-if pidof wlterm2 >/dev/null 2>&1; then
+if pidof wlterm2 wlterm-gl >/dev/null 2>&1; then
   echo quit > /tmp/wlterm2.ctl 2>/dev/null
-  i=0; while pidof wlterm2 >/dev/null 2>&1 && [ $i -lt 20 ]; do sleep 0.1; i=$((i + 1)); done
-  pidof wlterm2 >/dev/null 2>&1 && { kill -9 $(pidof wlterm2); sleep 0.3; }
+  i=0; while pidof wlterm2 wlterm-gl >/dev/null 2>&1 && [ $i -lt 20 ]; do sleep 0.1; i=$((i + 1)); done
+  pidof wlterm2 wlterm-gl >/dev/null 2>&1 && { kill -9 $(pidof wlterm2 wlterm-gl); sleep 0.3; }
 fi
+
 # $extra first so explicit arguments win
-setsid "$bin" $extra "$@" </dev/null >>"$log" 2>&1 &
+start() { b=$1; shift; setsid "$b" $extra "$@" </dev/null >>"$log" 2>&1 & }
+if [ "$renderer" != cpu ] && [ -n "$gl" ]; then
+  start "$gl" "$@"
+  if [ "$renderer" = auto ] && [ -n "$cpu" ]; then
+    # GL init problems (EGL/driver) show up within a second or two: fall back to the CPU renderer instead of leaving no terminal
+    ( sleep 4; pidof wlterm-gl >/dev/null 2>&1 || { echo "wlterm-gl did not start, falling back to wlterm2" >>"$log"; start "$cpu" "$@"; } ) </dev/null >/dev/null 2>&1 &
+  fi
+else
+  start "$cpu" "$@"
+fi
 exit 0

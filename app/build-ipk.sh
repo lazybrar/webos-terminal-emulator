@@ -1,6 +1,7 @@
 #!/bin/sh
 # Build org.tvwl.terminal ipk (ar archive of debian-binary, control.tar.gz, data.tar.gz) like ares-package does.
-# Self-contained: bundles the launcher page, the wlterm2 binary (build/wlterm2, run `make` first) and bin/wlterm-launch.
+# Self-contained: bundles the launcher page, wlterm2 (build/wlterm2, run `make` first), bin/wlterm-launch and, if built (make gl-term),
+# the GPU terminal wlterm-gl.
 set -e
 here=$(cd "$(dirname "$0")" && pwd); root=$(dirname "$here"); id=org.tvwl.terminal; out=${1:-$here/$id.ipk}
 ver=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$here/$id/appinfo.json")
@@ -12,6 +13,7 @@ mkdir -p "$app/bin" "$w/control"
 cp "$here/$id"/appinfo.json "$here/$id"/index.html "$here/$id"/icon80.png "$here/$id"/icon130.png "$app/"
 install -m 755 "$root/build/wlterm2" "$app/bin/wlterm2"
 install -m 755 "$root/scripts/wlterm-launch" "$app/bin/wlterm-launch"
+[ -x "$root/build/wlterm-gl" ] && install -m 755 "$root/build/wlterm-gl" "$app/bin/wlterm-gl" || echo "note: build/wlterm-gl missing, ipk will be CPU-only (make gl-term)" >&2
 size=$(du -sk "$w/data" | cut -f1)
 printf 'Package: %s\nVersion: %s\nSection: misc\nPriority: optional\nArchitecture: all\nInstalled-Size: %s\nMaintainer: tvwl <noreply@example.invalid>\nDescription: Terminal emulator for rooted webOS TVs (wlterm2 + launcher)\nWebos-Package-Format-Version: 2\nWebos-Packager-Info: {"app":"%s"}\n' "$id" "$ver" "$size" "$id" > "$w/control/control"
 printf '2.0\n' > "$w/debian-binary"

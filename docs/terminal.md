@@ -1,7 +1,21 @@
-# Running the terminal emulator (`wlterm2`)
+# Running the terminal emulator (`wlterm2` / `wlterm-gl`)
 
-`wlterm2` draws with the CPU into a `wl_shm` buffer, so it needs no GPU libraries and builds as one **64-bit static** binary
-(it runs on the TV's 32-bit userland because static aarch64 programs need no loader).
+One terminal, two renderers built from the same source (`terminal/wlterm2.c`):
+
+| | `wlterm2` (CPU) | `wlterm-gl` (GPU) |
+|---|---|---|
+| Drawing | `stb_truetype` rasterises into a `wl_shm` buffer | glyph atlas texture + one GLES2 quad per cell on the TV's PowerVR |
+| Build | **64-bit static** aarch64: no loader, no libraries | **32-bit ARM**, dynamic, links the TV's EGL/GLES2/libwayland (the PowerVR driver is 32-bit only) |
+| Make target | `make build/wlterm2` | `make gl-term` (see [GPU build](#gpu-build)) |
+
+`wlterm-launch` chooses with the `renderer` setting: `auto` (default) uses the GPU build if installed and falls back to the CPU one if
+it does not start, `gl` / `cpu` force one. The terminal logic (escape sequences, scrollback, keyboard, settings) is shared; only window
+creation, input plumbing and drawing differ (`terminal/front_gl.inc`).
+
+**What the GPU buys (measured on the TV, `seq 1 200000` flooding the screen, same shell, same drain logic):** the GPU build takes a steady
+~1.47 s using ~1.0 s of CPU; the CPU build takes 1.4-2.5 s using 1.1-2.3 s of CPU (the shell and pty set the floor at ~1.4 s). So the
+benefit is mainly **lower and steadier CPU load** and headroom for the programs you run, not a big wall-clock gain; idle redraws are cheap in both.
+Before the PTY-drain change (read the shell's output for a few ms before redrawing) a flood took 3-6 s on either renderer.
 
 ## Build
 
@@ -11,6 +25,18 @@ make build/wlterm2                           # aarch64-linux-gnu-gcc -static ...
 ```
 
 `stb_truetype.h` is the only dependency (header only). The `-idirafter` makes the cross compiler see the host copy.
+
+## GPU build
+
+```sh
+export TV_IP=<address of your TV>
+scripts/make-sysroot32.sh          # 32-bit glibc 2.31 headers/crt/libs from Debian bullseye armel (checksum-pinned), build time only
+scripts/pull-sysroot.sh            # the TV's own libEGL / libGLESv2 / libwayland-* for linking
+make gl-term                       # build/wlterm-gl; `make ipk` then bundles it
+```
+
+The binary needs only glibc symbols up to 2.29 (the TV has 2.31) and uses the TV's libraries at run time. The TV's libwayland is old and lacks
+`wl_proxy_marshal_flags`, so `front_gl.inc` calls the older marshalling functions directly instead of the inline wrappers in current headers.
 
 ## Install on the TV
 
@@ -43,7 +69,7 @@ Optional file `/media/developer/wlterm.conf` (override with `-c file` or `WLTERM
 `env = NAME=VALUE` (repeatable). Command-line flags win over the file, the file wins over the defaults. The default `HOME` (and start
 directory) is `/media/developer/home`, created on first start; the shell is Alpine's fish if installed, else `/bin/sh`.
 
-Options: `-c conf` `-H home` `-d start-dir` `-p extra-PATH` `-f regular.ttf` `-b bold.ttf` `-x fallback.ttf` (repeatable, e.g. a Nerd Font for icons) `-s <pixel size>` (default 30) `-e <shell>`.
+Options (both builds): `-c conf` `-H home` `-d start-dir` `-p extra-PATH` `-f regular.ttf` `-b bold.ttf` `-x fallback.ttf` (repeatable, e.g. a Nerd Font for icons) `-s <pixel size>` (default 30) `-e <shell>`.
 The launcher forwards its arguments, e.g. `wlterm-launch -e /bin/sh -d /tmp`.
 Environment for the shell: `TERM=xterm-256color`,
 `COLORTERM=truecolor`, `PATH` extended with `/usr/alpine/...` (see [system.md](system.md)).

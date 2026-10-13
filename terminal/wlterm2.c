@@ -1,5 +1,6 @@
 /* wlterm2: terminal for the webOS wayland compositor.
- * 64-bit static (aarch64), CPU rendering into wl_shm, TrueType fonts via stb_truetype.
+ * Default build: 64-bit static (aarch64), CPU rendering into wl_shm, TrueType fonts via stb_truetype.
+ * -DWLTERM_GL (see front_gl.inc): 32-bit ARM, GLES2 rendering on the TV's PowerVR through its own libwayland/EGL (wlterm-gl).
  * usage: wlterm2 [-f regular.ttf] [-b bold.ttf] [-x fallback.ttf]... [-s pixels] [-e shell]
  */
 #define _GNU_SOURCE
@@ -115,13 +116,15 @@ static void switch_screen(int alt) {
 }
 
 /* ------------------------------------------------------------------ rendering */
-static u32 *px; static int wfd, master;
+static int master, wfd;
 static u32 rgb_mix(u32 bg, u32 fg, int a) {
     int r = ((bg >> 16 & 255) * (255 - a) + (fg >> 16 & 255) * a) / 255;
     int g = ((bg >> 8 & 255) * (255 - a) + (fg >> 8 & 255) * a) / 255;
     int b = ((bg & 255) * (255 - a) + (fg & 255) * a) / 255;
     return 0xff000000u | r << 16 | g << 8 | b;
 }
+#ifndef WLTERM_GL
+static u32 *px;
 static void drawcell(int x, int y, const Cell *c, int iscur) {
     u32 fg = c->fg, bg = c->bg;
     if (c->at & A_INV) { u32 t = fg; fg = bg; bg = t; }
@@ -167,6 +170,7 @@ static void flush(void) {
     u32 d[4] = {0, lo * ch, W, (hi - lo + 1) * ch}; msg(7, 2, 4, d);
     msg(7, 6, 0, 0);
 }
+#endif
 
 /* ------------------------------------------------------------------ terminal emulation */
 static u32 pal256[256];
@@ -351,9 +355,13 @@ static void keyev(int k, int down) {
 }
 
 /* ------------------------------------------------------------------ wayland */
-static u32 wbuf[16384]; static int whave, quit;
-static u32 g_comp, g_shm, g_shell, g_seat[4]; static int nseat, have_kb[4]; static u32 nextkb;
+static int quit;
 static int eq(const char *a, const char *b) { return !strcmp(a, b); }
+#ifdef WLTERM_GL
+#include "front_gl.inc"
+#else
+static u32 wbuf[16384]; static int whave;
+static u32 g_comp, g_shm, g_shell, g_seat[4]; static int nseat, have_kb[4]; static u32 nextkb;
 static void bind_(u32 name, const char *ifc, u32 ver, u32 nid) {
     u32 b[32]; int l = strlen(ifc) + 1, w = (l + 3) / 4, n = 0;
     b[n++] = name; b[n++] = l; memset(&b[n], 0, w * 4); memcpy(&b[n], ifc, l); n += w; b[n++] = ver; b[n++] = nid; msg(2, 0, n, b);
@@ -391,6 +399,12 @@ static int wread(void) {
     }
     memmove(wbuf, (char *)wbuf + off, whave - off); whave -= off; return done;
 }
+static void front_shot(const char *path) {
+    FILE *f = fopen(path, "wb"); if (!f) return; fprintf(f, "P6\n%d %d\n255\n", W, H);
+    u8 *row = malloc(W * 3); for (int y = 0; y < H; y++) { for (int x = 0; x < W; x++) { u32 v = px[(size_t)y * W + x]; row[x * 3] = v >> 16; row[x * 3 + 1] = v >> 8; row[x * 3 + 2] = v; } fwrite(row, 3, W, f); }
+    free(row); fclose(f);
+}
+#endif
 
 
 /* ------------------------------------------------------------------ test control (fifo): in <text> | shot <path> | text <path> | quit */
@@ -409,9 +423,7 @@ static void ctl_line(char *l) {
         }
         out(o, n);
     } else if (!strncmp(l, "shot ", 5)) {
-        FILE *f = fopen(l + 5, "wb"); if (!f) return; fprintf(f, "P6\n%d %d\n255\n", W, H);
-        u8 *row = malloc(W * 3); for (int y = 0; y < H; y++) { for (int x = 0; x < W; x++) { u32 v = px[(size_t)y * W + x]; row[x * 3] = v >> 16; row[x * 3 + 1] = v >> 8; row[x * 3 + 2] = v; } fwrite(row, 3, W, f); }
-        free(row); fclose(f);
+        front_shot(l + 5);
     } else if (!strncmp(l, "text ", 5)) {
         FILE *f = fopen(l + 5, "wb"); if (!f) return; fprintf(f, "# %dx%d cursor=%d,%d alt=%d sb=%d\n", cols, rows, cx, cy, in_alt, sbcount);
         for (int y = 0; y < rows; y++) { int last = -1; for (int x = 0; x < cols; x++) if (scr[y][x].cp > 32) last = x;
@@ -426,7 +438,7 @@ static void ctl_read(void) {
 }
 
 /* ------------------------------------------------------------------ config */
-/* wlterm.conf: "key = value" lines, '#' comments. Keys: shell, home, cwd, path (appended to PATH), size, font, bold, fallback (repeatable), env NAME=VALUE (repeatable).
+/* wlterm.conf: "key = value" lines, '#' comments. Keys: shell, home, cwd, path (appended to PATH), size, font, bold, fallback (repeatable), env NAME=VALUE (repeatable), renderer (auto|gl|cpu, used by wlterm-launch).
    Precedence: command line > config file > built-in defaults. */
 #define MAXENV 16
 static const char *cfg_home = "/media/developer/home", *cfg_cwd, *cfg_path = "", *cfg_env[MAXENV]; static int ncfg_env;
@@ -438,7 +450,7 @@ static void load_conf(const char *file, const char **freg, const char **fbold, c
         *eq = 0; char *k = trim(l), *v = trim(eq + 1); if (!*k || !*v) continue; v = strdup(v);
         if (!strcmp(k, "shell")) *shell = v; else if (!strcmp(k, "home")) cfg_home = v; else if (!strcmp(k, "cwd")) cfg_cwd = v; else if (!strcmp(k, "path")) cfg_path = v;
         else if (!strcmp(k, "size")) px_size = atoi(v); else if (!strcmp(k, "font")) *freg = v; else if (!strcmp(k, "bold")) *fbold = v;
-        else if (!strcmp(k, "fallback") && *nfb < MAXFONTS - 2) fb[(*nfb)++] = v; else if (!strcmp(k, "env") && ncfg_env < MAXENV && strchr(v, '=')) cfg_env[ncfg_env++] = v;
+        else if (!strcmp(k, "fallback") && *nfb < MAXFONTS - 2) fb[(*nfb)++] = v; else if (!strcmp(k, "renderer")) { /* read by wlterm-launch */ } else if (!strcmp(k, "env") && ncfg_env < MAXENV && strchr(v, '=')) cfg_env[ncfg_env++] = v;
         else fprintf(stderr, "wlterm2: ignoring unknown config key '%s'\n", k);
     }
     fclose(f);
@@ -470,6 +482,9 @@ int main(int argc, char **argv) {
     for (int y = 0; y < rows; y++) { mainscr[y] = newrow(); altscr[y] = newrow(); }
     scr = mainscr; dirty = malloc(rows); tabs = calloc(cols, 1); for (int x = 8; x < cols; x += 8) tabs[x] = 1; top = 0; bot = rows - 1; markall();
 
+#ifdef WLTERM_GL
+    setenv("XDG_RUNTIME_DIR", "/tmp/xdg", 0); if (!gl_init()) return 1; wfd = wl_display_get_fd(dpy);
+#else
     const char *dir = getenv("XDG_RUNTIME_DIR"); if (!dir) dir = "/tmp/xdg";
     const char *disp = getenv("WAYLAND_DISPLAY"); if (!disp) disp = "wayland-0";
     struct sockaddr_un a = {AF_UNIX}; snprintf(a.sun_path, sizeof a.sun_path, "%s/%s", dir, disp);
@@ -490,6 +505,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < nseat; i++) bind_(g_seat[i], "wl_seat", 4, 11 + i);
     nextkb = 11 + nseat; { u32 st_ = 3; msg(8, 1, 1, &st_); }
     for (size_t i = 0; i < (size_t)W * H; i++) px[i] = 0xff000000u | DEFBG;
+#endif
 
     mkdir(cfg_home, 0755);
     struct winsize ws = {rows, cols, W, H}; pid_t pid = forkpty(&master, NULL, NULL, &ws);
@@ -510,13 +526,28 @@ int main(int argc, char **argv) {
     for (;;) {
         struct pollfd pf[3] = {{wfd, POLLIN, 0}, {master, POLLIN, 0}, {ctl_fd, POLLIN, 0}};
         int to = -1; if (rep_key >= 0) { to = rep_next - now_ms(); if (to < 0) to = 0; }
+#ifdef WLTERM_GL
+        while (wl_display_prepare_read(dpy) != 0) wl_display_dispatch_pending(dpy);
+        wl_display_flush(dpy);
+#endif
         poll(pf, 3, to);
+#ifdef WLTERM_GL
+        if (pf[0].revents & POLLIN) { if (wl_display_read_events(dpy) < 0) break; } else wl_display_cancel_read(dpy);
+        if (wl_display_dispatch_pending(dpy) < 0) break;
+#endif
         if (rep_key >= 0 && now_ms() >= rep_next) { keyout(rep_key); rep_next += rep_rate; }
+#ifndef WLTERM_GL
         if (pf[0].revents & POLLIN) { if (wread() < 0) break; }
+#endif
         if (pf[1].revents & POLLIN) {
             ssize_t k = read(master, pb, sizeof pb); if (k <= 0) break;
             if (viewoff) { viewoff = 0; markall(); }
             for (ssize_t i = 0; i < k; i++) feed(pb[i]);
+            /* keep draining a flood from the shell for a few ms so it costs one redraw, not one per 8 KB read (with GL a swap also blocks on vsync) */
+            for (long t0 = now_ms(); now_ms() - t0 < 8;) {
+                struct pollfd q = {master, POLLIN, 0}; if (poll(&q, 1, 0) <= 0 || !(q.revents & POLLIN)) break;
+                k = read(master, pb, sizeof pb); if (k <= 0) break; for (ssize_t i = 0; i < k; i++) feed(pb[i]);
+            }
         } else if (pf[1].revents & (POLLHUP | POLLERR)) break;
         if (pf[2].revents & POLLIN) ctl_read();
         if (quit) break;
