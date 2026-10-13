@@ -1,0 +1,24 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Terminal</title>
+<body style="margin:0;background:#101418;color:#d8dee9;font:32px sans-serif;display:flex;align-items:center;justify-content:center;height:100vh">
+<div id="m">Starting terminal…</div>
+<script>
+// Runs the launcher as root through the Homebrew Channel service (needs a rooted TV with it installed).
+// The page stays loaded while the terminal window is in front, so a second click on the icon does not reload it:
+// launch on load AND on every relaunch (webOSRelaunch), otherwise the second click only flashes this card.
+function done(t) { document.getElementById('m').textContent = t; }
+function launch() {
+  done('Starting terminal…');
+  try {
+    var bridge = new PalmServiceBridge();
+    bridge.onservicecallback = function (msg) {
+      var r = {}; try { r = JSON.parse(msg); } catch (e) {}
+      if (r.returnValue) { setTimeout(function () { window.close(); }, 900); } else { done('Launch failed: ' + (r.errorText || msg)); }
+    };
+    bridge.call('luna://org.webosbrew.hbchannel.service/exec', JSON.stringify({ command: '/media/developer/bin/wlterm-launch' }));
+  } catch (e) { done('PalmServiceBridge unavailable: ' + e); }
+}
+document.addEventListener('webOSRelaunch', launch);
+launch();
+</script>

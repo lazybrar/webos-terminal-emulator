@@ -1,0 +1,11 @@
+#!/bin/sh
+# Start wlterm2 detached (runs as root on the TV). If one is already running its window is hidden behind the launcher
+# card and cannot be re-shown, so it is closed (clean quit, then kill) and replaced by a fresh one.
+export XDG_RUNTIME_DIR=/tmp/xdg
+if pidof wlterm2 >/dev/null 2>&1; then
+  echo quit > /tmp/wlterm2.ctl 2>/dev/null
+  i=0; while pidof wlterm2 >/dev/null 2>&1 && [ $i -lt 20 ]; do sleep 0.1; i=$((i + 1)); done
+  pidof wlterm2 >/dev/null 2>&1 && { kill -9 $(pidof wlterm2); sleep 0.3; }
+fi
+setsid /media/developer/bin/wlterm2 "$@" </dev/null >/tmp/wlterm2.log 2>&1 &
+exit 0

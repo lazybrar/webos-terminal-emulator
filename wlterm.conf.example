@@ -1,0 +1,12 @@
+# wlterm2 settings. Copy to /media/developer/wlterm.conf (or point WLTERM_CONF / -c at another file).
+# Precedence: command-line flags > this file > built-in defaults. Everything is optional.
+
+# shell      = /usr/alpine/usr/bin/fish   # default: that one if installed, else /bin/sh
+# home       = /media/developer/home      # $HOME (created if missing); default shown
+# cwd        = /media/developer           # starting directory; default: home
+# path       = /opt/bin:/media/developer/tools   # appended to PATH
+# size       = 30                         # font pixel size
+# font       = /media/developer/fonts/FiraCode-Regular.ttf
+# bold       = /media/developer/fonts/FiraCode-Bold.ttf
+# fallback   = /media/developer/fonts/SymbolsNerdFontMono-Regular.ttf   # repeatable
+# env        = EDITOR=nano                # repeatable: NAME=VALUE

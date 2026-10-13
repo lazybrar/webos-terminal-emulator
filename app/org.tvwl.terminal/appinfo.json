@@ -1,0 +1,14 @@
+{
+    "id": "org.tvwl.terminal",
+    "version": "1.0.1",
+    "vendor": "tvwl",
+    "type": "web",
+    "main": "index.html",
+    "title": "Terminal",
+    "icon": "icon80.png",
+    "largeIcon": "icon130.png",
+    "iconColor": "#101418",
+    "bgColor": "#101418",
+    "handlesRelaunch": true,
+    "appDescription": "Launches wlterm2, a GPU-free Wayland terminal, as a native window"
+}

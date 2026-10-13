@@ -1,0 +1,16 @@
+#!/bin/sh
+# Stack persistent writable overlays (upper on ext4 /media) over /usr and /lib.
+# Submounts (fonts, nyx modules, ...) are re-bound so they keep working.
+# Undo: remove this file and reboot (or umount -l /usr /lib), delete /media/developer/rw.
+B=/media/developer/rw
+for t in usr lib etc; do
+  grep -q "^overlay /$t overlay .*upperdir=$B/$t/up" /proc/mounts && continue
+  mkdir -p $B/$t/up $B/$t/work /tmp/rw-$t
+  mount -t overlay overlay -o lowerdir=/$t,upperdir=$B/$t/up,workdir=$B/$t/work /tmp/rw-$t || continue
+  awk -v p="/$t/" 'index($2,p)==1{print $2}' /proc/mounts | sort -u | while read -r m; do
+    mkdir -p "/tmp/rw-$t${m#/$t}" 2>/dev/null
+    mount --bind "$m" "/tmp/rw-$t${m#/$t}"
+  done
+  mount --rbind /tmp/rw-$t /$t
+done
+exit 0
