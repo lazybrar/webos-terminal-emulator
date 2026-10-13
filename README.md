@@ -31,9 +31,9 @@ Requirements: a rooted webOS TV with the Homebrew Channel (it provides the root 
    (checksum in `SHA256SUMS`) and install it:
    ```sh
    mkdir -p /media/developer/temp && cd /media/developer/temp
-   curl -sSfLO https://github.com/lazybrar/webos-terminal-emulator/releases/latest/download/org.tvwl.terminal_1.1.0_all.ipk
+   curl -sSfLO https://github.com/lazybrar/webos-terminal-emulator/releases/latest/download/org.tvwl.terminal_1.2.0_all.ipk
    luna-send -i -f luna://com.webos.appInstallService/dev/install \
-     '{"id":"org.tvwl.terminal","ipkUrl":"/media/developer/temp/org.tvwl.terminal_1.1.0_all.ipk","subscribe":true}'
+     '{"id":"org.tvwl.terminal","ipkUrl":"/media/developer/temp/org.tvwl.terminal_1.2.0_all.ipk","subscribe":true}'
    ```
    Wait for `"state": "installed"`. (Other installers that accept dev-mode ipks should work too; this is the one tested.)
 2. Open **Terminal** from the home screen. The first start downloads Fira Code (needs internet; without it the TV's DroidSansMono is used).
